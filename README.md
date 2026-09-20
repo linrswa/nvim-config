@@ -6,40 +6,43 @@ A Neovim 0.12+ configuration for Python and Verilog/SystemVerilog development. I
 
 ### Required
 
+Install these with the package manager available on your operating system:
+
 - Neovim 0.12 or newer (`tiny-cmdline.nvim` and native `vim.pack` require it)
-- Git
+- Git for plugin installation and Git integrations
 - `tree-sitter` CLI for compiling Treesitter parsers
-- A C compiler and `make` for native parser builds
+- A C compiler (`cc`, `gcc`, or `clang`) and `make` for native parser builds
 - `rg` (ripgrep) for Telescope live grep
 - `lazygit` for the in-editor Git interface
-- A Bash-compatible shell to run `install.sh`
+- `curl` or `wget`, plus `tar`, `gzip`, and `unzip`, for plugin and Mason downloads
+- A Bash-compatible shell and standard Unix utilities to run `install.sh`
 
-### Optional
+### Recommended and optional
 
-- npm, only if you choose to install `basedpyright` through Mason
+- `fd` for faster Telescope file discovery
+- `fzf` for command-line fuzzy finding; Telescope works without it in the current configuration
+- Node.js and npm, only if you choose to install `basedpyright` through Mason
 - A Nerd Font for all plugin icons
 - tmux for `vim-tmux-navigator` integration
 
-On macOS, install the command-line dependencies with Homebrew:
+Check the required commands before installation:
 
 ```sh
-xcode-select --install
-brew install neovim git tree-sitter-cli ripgrep lazygit
+for cmd in nvim git tree-sitter cc make rg lazygit; do
+    command -v "$cmd" >/dev/null || echo "Missing: $cmd"
+done
 ```
 
-Confirm the main requirements before installation:
+You can also check the recommended search tools with:
 
 ```sh
-nvim --version | head -1
-git --version
-tree-sitter --version
-rg --version | head -1
-lazygit --version
+command -v fd >/dev/null || echo "Optional tool missing: fd"
+command -v fzf >/dev/null || echo "Optional tool missing: fzf"
 ```
 
 ## Installation
 
-The installer supports macOS and Linux and copies only runtime configuration files into `${XDG_CONFIG_HOME:-$HOME/.config}/nvim`:
+The installer copies only runtime configuration files into `${XDG_CONFIG_HOME:-$HOME/.config}/nvim` and does not depend on a specific package manager:
 
 ```sh
 git clone https://github.com/linrswa/nvim-config.git
