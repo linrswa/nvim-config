@@ -2,37 +2,69 @@
 
 A Neovim 0.12+ configuration for Python and Verilog/SystemVerilog development. It uses native `vim.pack`, native `vim.lsp`, Mason, Treesitter, Telescope, blink.cmp, and Conform.
 
-## Requirements
+## Prerequisites
 
-- Neovim 0.12 or newer
+### Required
+
+- Neovim 0.12 or newer (`tiny-cmdline.nvim` and native `vim.pack` require it)
 - Git
-- `tree-sitter` CLI for compiling parsers
+- `tree-sitter` CLI for compiling Treesitter parsers
+- A C compiler and `make` for native parser builds
 - `rg` (ripgrep) for Telescope live grep
 - `lazygit` for the in-editor Git interface
-- A C compiler and `make` for native parser builds
-- npm only if you choose to install `basedpyright` through Mason
+- A Bash-compatible shell to run `install.sh`
 
-On macOS, the external command-line dependencies can be installed with Homebrew:
+### Optional
+
+- npm, only if you choose to install `basedpyright` through Mason
+- A Nerd Font for all plugin icons
+- tmux for `vim-tmux-navigator` integration
+
+On macOS, install the command-line dependencies with Homebrew:
 
 ```sh
-brew install tree-sitter-cli ripgrep lazygit
+xcode-select --install
+brew install neovim git tree-sitter-cli ripgrep lazygit
+```
+
+Confirm the main requirements before installation:
+
+```sh
+nvim --version | head -1
+git --version
+tree-sitter --version
+rg --version | head -1
+lazygit --version
 ```
 
 ## Installation
 
-Clone, copy, or symlink this directory to Neovim's configuration location:
-
-- macOS/Linux: `~/.config/nvim`
-- Windows: `%LOCALAPPDATA%\nvim`
-
-Example using a symlink:
+The installer supports macOS and Linux and copies only runtime configuration files into `${XDG_CONFIG_HOME:-$HOME/.config}/nvim`:
 
 ```sh
-mkdir -p ~/.config
-ln -s /path/to/this/repository ~/.config/nvim
+git clone https://github.com/linrswa/nvim-config.git
+cd nvim-config
+./install.sh
 ```
 
-Start Neovim after installation:
+Installed files:
+
+```text
+~/.config/nvim/
+├── init.lua
+├── lua/
+└── nvim-pack-lock.json
+```
+
+The installer deliberately excludes `examples/`, `README.md`, `install.sh`, `.git/`, and other repository-only files. If an unrelated `~/.config/nvim` already exists, it is moved to a timestamped backup before installation. Running the installer from a repository already symlinked as `~/.config/nvim` replaces that symlink with a standalone configuration directory.
+
+To use a non-default config home, set `XDG_CONFIG_HOME` when running the installer:
+
+```sh
+XDG_CONFIG_HOME=/custom/config/path ./install.sh
+```
+
+After installation, start Neovim:
 
 ```sh
 nvim
