@@ -11,11 +11,11 @@ Install these with the package manager available on your operating system:
 - Neovim 0.12 or newer (`tiny-cmdline.nvim` and native `vim.pack` require it)
 - Git for plugin installation and Git integrations
 - `tree-sitter` CLI for compiling Treesitter parsers
-- A C compiler (`cc`, `gcc`, or `clang`) and `make` for native parser builds
+- A C toolchain for native parser builds: Clang/GCC and `make` on Unix-like systems, or MSVC Build Tools on Windows
 - `rg` (ripgrep) for Telescope live grep
 - `lazygit` for the in-editor Git interface
 - `curl` or `wget`, plus `tar`, `gzip`, and `unzip`, for plugin and Mason downloads
-- A Bash-compatible shell and standard Unix utilities to run `install.sh`
+- Bash and standard Unix utilities for `install.sh`, or PowerShell for `install.ps1` on Windows
 
 ### Recommended and optional
 
@@ -25,7 +25,7 @@ Install these with the package manager available on your operating system:
 - A Nerd Font for all plugin icons
 - tmux for `vim-tmux-navigator` integration
 
-Check the required commands before installation:
+Check the required commands on a Unix-like system with:
 
 ```sh
 for cmd in nvim git tree-sitter cc make rg lazygit; do
@@ -33,39 +33,59 @@ for cmd in nvim git tree-sitter cc make rg lazygit; do
 done
 ```
 
-You can also check the recommended search tools with:
+On Windows PowerShell:
 
-```sh
-command -v fd >/dev/null || echo "Optional tool missing: fd"
-command -v fzf >/dev/null || echo "Optional tool missing: fzf"
+```powershell
+"nvim", "git", "tree-sitter", "rg", "lazygit" | ForEach-Object {
+    if (-not (Get-Command $_ -ErrorAction SilentlyContinue)) {
+        Write-Host "Missing: $_"
+    }
+}
 ```
+
+`fd` and `fzf` can be checked the same way if you install the recommended search tools.
 
 ## Installation
 
-The installer copies only runtime configuration files into `${XDG_CONFIG_HOME:-$HOME/.config}/nvim` and does not depend on a specific package manager:
+Clone the repository first:
 
 ```sh
 git clone https://github.com/linrswa/nvim-config.git
 cd nvim-config
+```
+
+### Linux and other Unix-like systems
+
+Linux follows the XDG Base Directory convention. `install.sh` installs to `${XDG_CONFIG_HOME:-$HOME/.config}/nvim`:
+
+```sh
 ./install.sh
 ```
 
-Installed files:
+To use a non-default config home:
+
+```sh
+XDG_CONFIG_HOME=/custom/config/path ./install.sh
+```
+
+### Windows
+
+Native Windows Neovim uses `%LOCALAPPDATA%\nvim`, not `XDG_CONFIG_HOME`. Run the PowerShell installer:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+The resulting runtime configuration contains only:
 
 ```text
-~/.config/nvim/
+nvim/
 ├── init.lua
 ├── lua/
 └── nvim-pack-lock.json
 ```
 
-The installer deliberately excludes `examples/`, `README.md`, `install.sh`, `.git/`, and other repository-only files. If an unrelated `~/.config/nvim` already exists, it is moved to a timestamped backup before installation. Running the installer from a repository already symlinked as `~/.config/nvim` replaces that symlink with a standalone configuration directory.
-
-To use a non-default config home, set `XDG_CONFIG_HOME` when running the installer:
-
-```sh
-XDG_CONFIG_HOME=/custom/config/path ./install.sh
-```
+Both installers deliberately exclude `examples/`, `README.md`, installer scripts, `.git/`, and other repository-only files. If an existing configuration is present, it is moved to a timestamped backup before installation. On Unix-like systems, running `install.sh` from a repository already symlinked as `~/.config/nvim` replaces that symlink with a standalone configuration directory.
 
 After installation, start Neovim:
 

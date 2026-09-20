@@ -36,4 +36,4 @@ trap - EXIT
 
 printf 'Installed Neovim config to %s\n' "$TARGET_DIR"
 printf 'Included: init.lua, lua/, nvim-pack-lock.json\n'
-printf 'Excluded: examples/, README.md, install.sh, and Git metadata\n'
+printf 'Excluded: examples/, README.md, installer scripts, and Git metadata\n'
