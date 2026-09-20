@@ -25,7 +25,6 @@ vim.pack.add({
     "https://github.com/rachartier/tiny-cmdline.nvim",
     "https://github.com/artemave/workspace-diagnostics.nvim",
     "https://github.com/martindur/zdiff.nvim",
-    "https://github.com/lewis6991/gitsigns.nvim",
     "https://github.com/kdheepak/lazygit.nvim",
     {
         src = "https://github.com/christoomey/vim-tmux-navigator",
@@ -43,7 +42,6 @@ require("plugins.tiny-cmdline")
 require("plugins.formatting")
 require("plugins.treesj")
 require("plugins.zdiff")
-require("plugins.gitsigns")
 require("plugins.lazygit")
 require("plugins.hlslens")
 require("plugins.tiny-code-action")

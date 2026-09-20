@@ -127,7 +127,6 @@ Native `vim.pack` installs the plugins and updates `nvim-pack-lock.json`. Mason 
 
 - `kanagawa.nvim`
 - `tiny-cmdline.nvim`, integrated with blink.cmp
-- `gitsigns.nvim`
 - `zdiff.nvim`
 - `lazygit.nvim`
 
@@ -184,15 +183,6 @@ Workspace diagnostics are populated automatically when an LSP client attaches. `
 ### Git and diff
 
 - `<leader>gg`: Open LazyGit at the current file's Git project
-- `[c`, `]c`: Previous or next Git hunk
-- `<leader>gs`, `<leader>gr`: Stage or reset the current hunk
-- Visual `<leader>gs`, `<leader>gr`: Stage or reset the selected hunk
-- `<leader>gS`, `<leader>gR`: Stage or reset the current buffer
-- `<leader>gp`: Preview the current hunk
-- `<leader>gb`: Show full blame for the current line
-- `<leader>gd`: Diff against the Git index
-- `<leader>gD`: Diff against the previous commit
-- `ih` in operator-pending or Visual mode: Select a Git hunk
 - `<leader>zd`: Open Zdiff for uncommitted changes
 - `<leader>zD`: Open Zdiff against `main`
 
