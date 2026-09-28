@@ -9,5 +9,5 @@ require("mason-lspconfig").setup({
         "ruff",
         "verible",
     },
-    automatic_enable = false,
+    automatic_enable = true,
 })

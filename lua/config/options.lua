@@ -15,3 +15,10 @@ vim.opt.cmdheight = 0
 
 vim.opt.splitright = true
 vim.opt.splitbelow = true
+
+vim.opt.clipboard = "unnamedplus"
+
+vim.diagnostic.config({
+    virtual_text = { source = "always" },
+    float = { source = "always" },
+})
