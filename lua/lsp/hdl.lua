@@ -61,6 +61,18 @@ end, {
 
 local lint = require("lsp.verilator_lint")
 local group = vim.api.nvim_create_augroup("HdlLintOnSave", { clear = true })
+vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "TextChangedP" }, {
+    group = group,
+    pattern = { "*.sv", "*.v", "*.svh", "*.vh" },
+    callback = function(args)
+        local root = vim.fs.root(args.buf, { ".git", "CMakeLists.txt" })
+        -- Live edits only read the existing list; never scan/write project files.
+        if root and vim.uv.fs_stat(root .. "/verible.filelist") then
+            lint.run(root, args.buf)
+        end
+    end,
+    desc = "以未儲存的 buffer 執行 debounced Verilator lint",
+})
 vim.api.nvim_create_autocmd("BufWritePost", {
     group = group,
     pattern = { "*.sv", "*.v", "*.svh", "*.vh" },
