@@ -7,6 +7,10 @@ vim.lsp.config("verible", {
         "verilog",
         "systemverilog",
     },
+    on_attach = function(client)
+        -- This Verible version answers hover requests but advertises hoverProvider=false.
+        client.server_capabilities.hoverProvider = true
+    end,
 })
 
 vim.lsp.enable("verible")
