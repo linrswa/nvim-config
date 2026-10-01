@@ -11,6 +11,24 @@ vim.lsp.config("verible", {
 
 vim.lsp.enable("verible")
 
+vim.api.nvim_create_user_command("HdlInstance", function()
+    require("hdl.instance").open()
+end, {
+    desc = "預覽並插入專案 module 的 instance 模板（使用已儲存檔案）",
+    force = true,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+    group = vim.api.nvim_create_augroup("HdlInstanceKeymaps", { clear = true }),
+    pattern = { "verilog", "systemverilog" },
+    callback = function(args)
+        vim.keymap.set("n", "<leader>fi", "<cmd>HdlInstance<CR>", {
+            buffer = args.buf,
+            desc = "Find HDL instance",
+        })
+    end,
+})
+
 local function scan(silent)
     local root = vim.fs.root(0, { ".git", "CMakeLists.txt" })
     if not root then
