@@ -1,10 +1,15 @@
 local conform = require("conform")
 
 conform.setup({
+    formatters = {
+        verible = {
+            prepend_args = { "--port_declarations_alignment=align" },
+        },
+    },
     formatters_by_ft = {
         python = { "ruff_organize_imports", "ruff_format" },
-        verilog = { "verible_verilog_format" },
-        systemverilog = { "verible_verilog_format" },
+        verilog = { "verible" },
+        systemverilog = { "verible" },
     },
 })
 

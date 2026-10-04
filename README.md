@@ -82,6 +82,7 @@ The resulting runtime configuration contains only:
 nvim/
 ├── init.lua
 ├── lua/
+├── after/
 └── nvim-pack-lock.json
 ```
 
@@ -190,7 +191,8 @@ Workspace diagnostics are populated automatically when an LSP client attaches. `
 
 - Python uses Ruff for LSP features and formatting.
 - `basedpyright` provides Python type checking when installed separately.
-- Verilog and SystemVerilog use Verible for LSP features and formatting.
+- Verilog and SystemVerilog use Verible for LSP features and formatting. Conform uses the `verible` formatter with `--port_declarations_alignment=align`.
 - Both HDL filetypes use the Treesitter SystemVerilog parser.
+- `after/indent/systemverilog.lua` supplements the built-in SystemVerilog indentation: leading `)` aligns with the matching opening parenthesis's line, and `endmodule` aligns with its matching `module`. Matching ignores comments, strings, and escaped identifiers; other lines retain the built-in rules. This affects typing and `=` indentation, not `<leader>f` formatting.
 
 Use `:Mason` to inspect external tool installation and `:checkhealth` to diagnose the environment.

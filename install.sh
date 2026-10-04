@@ -5,7 +5,7 @@ SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 TARGET_DIR="$CONFIG_HOME/nvim"
 
-for path in init.lua lua nvim-pack-lock.json; do
+for path in init.lua lua after nvim-pack-lock.json; do
     if [[ ! -e "$SOURCE_DIR/$path" ]]; then
         printf 'Missing required source: %s\n' "$SOURCE_DIR/$path" >&2
         exit 1
@@ -22,6 +22,7 @@ trap cleanup EXIT
 cp "$SOURCE_DIR/init.lua" "$STAGING_DIR/init.lua"
 cp "$SOURCE_DIR/nvim-pack-lock.json" "$STAGING_DIR/nvim-pack-lock.json"
 cp -R "$SOURCE_DIR/lua" "$STAGING_DIR/lua"
+cp -R "$SOURCE_DIR/after" "$STAGING_DIR/after"
 
 if [[ -L "$TARGET_DIR" ]] && [[ "$(cd "$TARGET_DIR" && pwd -P)" == "$SOURCE_DIR" ]]; then
     rm "$TARGET_DIR"
@@ -35,5 +36,5 @@ mv "$STAGING_DIR" "$TARGET_DIR"
 trap - EXIT
 
 printf 'Installed Neovim config to %s\n' "$TARGET_DIR"
-printf 'Included: init.lua, lua/, nvim-pack-lock.json\n'
+printf 'Included: init.lua, lua/, after/, nvim-pack-lock.json\n'
 printf 'Excluded: examples/, README.md, installer scripts, and Git metadata\n'

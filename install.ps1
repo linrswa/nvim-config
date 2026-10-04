@@ -6,7 +6,7 @@ if (-not $env:LOCALAPPDATA) {
 }
 
 $TargetDir = Join-Path $env:LOCALAPPDATA "nvim"
-$RequiredPaths = @("init.lua", "lua", "nvim-pack-lock.json")
+$RequiredPaths = @("init.lua", "lua", "after", "nvim-pack-lock.json")
 
 foreach ($Path in $RequiredPaths) {
     $SourcePath = Join-Path $SourceDir $Path
@@ -22,6 +22,7 @@ try {
     Copy-Item (Join-Path $SourceDir "init.lua") $StagingDir
     Copy-Item (Join-Path $SourceDir "nvim-pack-lock.json") $StagingDir
     Copy-Item (Join-Path $SourceDir "lua") $StagingDir -Recurse
+    Copy-Item (Join-Path $SourceDir "after") $StagingDir -Recurse
 
     if (Test-Path $TargetDir) {
         $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -40,5 +41,5 @@ catch {
 }
 
 Write-Host "Installed Neovim config to $TargetDir"
-Write-Host "Included: init.lua, lua/, nvim-pack-lock.json"
+Write-Host "Included: init.lua, lua/, after/, nvim-pack-lock.json"
 Write-Host "Excluded: examples/, README.md, installer scripts, and Git metadata"
