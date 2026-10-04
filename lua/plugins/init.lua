@@ -17,6 +17,7 @@ vim.pack.add({
     "https://github.com/nvim-telescope/telescope.nvim",
     "https://github.com/saghen/blink.lib",
     "https://github.com/Saghen/blink.cmp",
+    "https://github.com/rafamadriz/friendly-snippets",
     "https://github.com/stevearc/conform.nvim",
     "https://github.com/kevinhwang91/nvim-hlslens",
     "https://github.com/rachartier/tiny-code-action.nvim",
