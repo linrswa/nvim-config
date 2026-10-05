@@ -22,6 +22,13 @@ end, {
     force = true,
 })
 
+vim.api.nvim_create_user_command("HdlTestbench", function()
+    require("hdl.instance").open_testbench()
+end, {
+    desc = "預覽並插入專案 module 的 testbench 模板（使用已儲存檔案）",
+    force = true,
+})
+
 vim.api.nvim_create_autocmd("FileType", {
     group = vim.api.nvim_create_augroup("HdlInstanceKeymaps", { clear = true }),
     pattern = { "verilog", "systemverilog" },

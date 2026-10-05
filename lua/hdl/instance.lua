@@ -109,11 +109,13 @@ local function module_info(node, source, path)
         for _, port in ipairs(children(list)) do
             if type(port) == "table" and port.tag ~= "," then
                 local ts = leaves(port)
-                local pname, description
+                local pname, description, direction
                 if port.tag == "kPort" and #ts == 1 and ts[1].tag == "SymbolIdentifier" and inherited then
-                    pname, description = text(source, ts[1]), inherited
+                    pname = text(source, ts[1])
+                    description = inherited.description
+                    direction = inherited.direction
                 elseif port.tag == "kPortDeclaration" then
-                    local direction = ts[1] and text(source, ts[1])
+                    direction = ts[1] and text(source, ts[1])
                     if direction ~= "input" and direction ~= "output" and direction ~= "inout" then
                         return reject("interface/implicit-direction ports are not supported")
                     end
@@ -142,13 +144,13 @@ local function module_info(node, source, path)
                     local parts = {}
                     for i = 1, #ts - 1 do parts[#parts + 1] = text(source, ts[i]):gsub("%s+", " ") end
                     description = table.concat(parts, " ")
-                    inherited = description
+                    inherited = { description = description, direction = direction }
                 else
                     return reject("non-ANSI/complex port list")
                 end
                 if not identifier(pname) or seen[pname] then return reject("unsupported or duplicate port name") end
                 seen[pname] = true
-                ports[#ports + 1] = { name = pname, description = description }
+                ports[#ports + 1] = { name = pname, description = description, direction = direction }
             end
         end
     end
@@ -206,8 +208,114 @@ function M.render(module, indent, unit)
     return lines
 end
 
-function M.open()
-    if active then notify("an instance search/picker is already open", vim.log.levels.WARN); return end
+local function strip_leading_word(value, words)
+    local word, rest = value:match("^(%S+)%s*(.*)$")
+    if word and words[word] then return rest end
+    return value
+end
+
+local function starts_with_type(value)
+    local word = value:match("^(%S+)")
+    return word == "logic" or word == "bit" or word == "byte" or word == "shortint"
+        or word == "int" or word == "longint" or word == "integer" or word == "time"
+end
+
+local function port_local_type(port)
+    local value = (port.description or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    value = strip_leading_word(value, { input = true, output = true, inout = true })
+    value = strip_leading_word(value, { wire = true, tri = true, reg = true, var = true })
+    if value == "" or value:match("^%[") or value:match("^signed%f[%W]") or value:match("^unsigned%f[%W]") then
+        value = "logic" .. (value ~= "" and (" " .. value) or "")
+    elseif not starts_with_type(value) then
+        value = "logic " .. value
+    end
+    return value
+end
+
+local function aligned_signal_lines(ports, indent)
+    local decls, width = {}, 0
+    for _, port in ipairs(ports or {}) do
+        local kind = port_local_type(port)
+        decls[#decls + 1] = { kind = kind, name = port.name }
+        width = math.max(width, #kind)
+    end
+    local lines = {}
+    for _, decl in ipairs(decls) do
+        lines[#lines + 1] = indent .. decl.kind .. string.rep(" ", width - #decl.kind + 1) .. decl.name .. ";"
+    end
+    return lines
+end
+
+function M.render_testbench(module, indent, unit)
+    indent, unit = indent or "", unit or "    "
+    local lines = { indent .. "module " .. module.name .. "_tb;" }
+    if module.parameters and #module.parameters > 0 then
+        for _, parameter in ipairs(module.parameters) do
+            if not parameter.scoped then
+                lines[#lines + 1] = indent .. unit .. "localparam int " .. parameter.name .. " = " .. parameter.default .. ";"
+            end
+        end
+        lines[#lines + 1] = ""
+    end
+    vim.list_extend(lines, aligned_signal_lines(module.ports, indent .. unit))
+    lines[#lines + 1] = ""
+
+    if module.parameters and #module.parameters > 0 then
+        lines[#lines + 1] = indent .. unit .. module.name .. " #("
+        for i, parameter in ipairs(module.parameters) do
+            lines[#lines + 1] = indent .. unit .. unit .. "." .. parameter.name
+                .. "(" .. (parameter.scoped and "" or parameter.name) .. ")"
+                .. (i < #module.parameters and "," or "")
+                .. (parameter.scoped and (" // Keep module default: " .. parameter.default) or "")
+        end
+        lines[#lines + 1] = indent .. unit .. ") dut ("
+    else
+        lines[#lines + 1] = indent .. unit .. module.name .. " dut ("
+    end
+    local max_port = 0
+    for _, port in ipairs(module.ports or {}) do max_port = math.max(max_port, #port.name) end
+    for i, port in ipairs(module.ports or {}) do
+        lines[#lines + 1] = indent .. unit .. unit .. "." .. port.name
+            .. string.rep(" ", max_port - #port.name) .. "(" .. port.name .. ")"
+            .. (i < #module.ports and "," or "")
+    end
+    lines[#lines + 1] = indent .. unit .. ");"
+    lines[#lines + 1] = ""
+
+    local args = {}
+    for _, port in ipairs(module.ports or {}) do
+        local prefix = port.direction == "output" and "expected_" or "test_"
+        args[#args + 1] = { kind = port_local_type(port), name = prefix .. port.name }
+    end
+    lines[#lines + 1] = indent .. unit .. "task automatic check("
+    local max_kind = 0
+    for _, arg in ipairs(args) do max_kind = math.max(max_kind, #arg.kind) end
+    for i, arg in ipairs(args) do
+        lines[#lines + 1] = indent .. unit .. unit .. "input " .. arg.kind
+            .. string.rep(" ", max_kind - #arg.kind + 1) .. arg.name
+            .. (i < #args and "," or "")
+    end
+    lines[#lines + 1] = indent .. unit .. ");"
+    lines[#lines + 1] = indent .. unit .. unit .. "// TODO: drive inputs and check outputs"
+    lines[#lines + 1] = indent .. unit .. "endtask"
+    lines[#lines + 1] = ""
+
+    lines[#lines + 1] = indent .. unit .. "initial begin"
+    lines[#lines + 1] = indent .. unit .. unit .. "$dumpfile(\"" .. module.name .. ".vcd\");"
+    lines[#lines + 1] = indent .. unit .. unit .. "$dumpvars(0, " .. module.name .. "_tb);"
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = indent .. unit .. unit .. "// TODO: add test cases"
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = indent .. unit .. unit .. "$display(\"PASS: " .. module.name .. "\");"
+    lines[#lines + 1] = indent .. unit .. unit .. "$finish;"
+    lines[#lines + 1] = indent .. unit .. "end"
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = indent .. "endmodule"
+    return lines
+end
+
+local function open_with(render, preview_title, prompt_title)
+    if active then notify("an HDL module picker is already open", vim.log.levels.WARN); return end
     local ok, pickers = pcall(require, "telescope.pickers")
     if not ok then notify("Telescope is unavailable: " .. tostring(pickers)); return end
     local buf, win = vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
@@ -252,7 +360,7 @@ function M.open()
         local actions = require("telescope.actions")
         local state = require("telescope.actions.state")
         local picker = pickers.new({}, {
-            prompt_title = "HDL modules (saved sources)",
+            prompt_title = prompt_title or "HDL modules (saved sources)",
             finder = require("telescope.finders").new_table({
                 results = modules,
                 entry_maker = function(item)
@@ -263,9 +371,9 @@ function M.open()
             }),
             sorter = require("telescope.config").values.generic_sorter({}),
             previewer = require("telescope.previewers").new_buffer_previewer({
-                title = "Instantiation (parameters + ports)",
+                title = preview_title,
                 define_preview = function(self, entry)
-                    vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, M.render(entry.value))
+                    vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, render(entry.value))
                     vim.bo[self.state.bufnr].filetype = "systemverilog"
                 end,
             }),
@@ -287,7 +395,7 @@ function M.open()
                     local width = vim.bo[buf].shiftwidth
                     if width == 0 then width = vim.bo[buf].tabstop end
                     local unit = vim.bo[buf].expandtab and string.rep(" ", width) or "\t"
-                    local rendered = M.render(entry.value, line:match("^%s*") or "", unit)
+                    local rendered = render(entry.value, line:match("^%s*") or "", unit)
                     local inserted, err = pcall(vim.api.nvim_buf_set_lines, buf, pos[1] + 1, pos[1] + 1, false, rendered)
                     if not inserted then notify("insertion failed: " .. tostring(err)); return end
                     if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
@@ -344,6 +452,14 @@ function M.open()
     end
     notify("reading " .. #files .. " saved source(s)…", vim.log.levels.INFO)
     next_file()
+end
+
+function M.open()
+    open_with(M.render, "Instantiation (parameters + ports)", "HDL modules (saved sources)")
+end
+
+function M.open_testbench()
+    open_with(M.render_testbench, "Testbench template", "HDL modules for testbench")
 end
 
 return M
