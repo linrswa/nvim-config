@@ -52,7 +52,7 @@ local function mirror(source, target)
     end
 end
 
-local function snapshot(root, run)
+local function snapshot(root, run, source_buf)
     run.dir = vim.fn.tempname()
     snapshots[run] = true
     mirror(root, run.dir)
@@ -84,7 +84,7 @@ local function snapshot(root, run)
     -- VeribleScan produces a plain source list, not a Verilator command file.
     -- Reject flags/nested lists rather than silently reading unsaved files from
     -- the real tree. Absolute project-local entries are remapped as well.
-    local list = {}
+    local list, listed = {}, {}
     for _, line in ipairs(vim.fn.readfile(run.dir .. "/verible.filelist")) do
         local path = vim.trim(line)
         if path ~= "" and not path:match("^#") and not path:match("^//") then
@@ -93,7 +93,25 @@ local function snapshot(root, run)
             path = vim.fs.normalize(path)
             assert(inside(path, root), "external filelist sources are not supported by live lint: " .. path)
             list[#list + 1] = '"' .. run.dir .. "/" .. path:sub(#root + 2) .. '"'
+            listed[path] = true
         end
+    end
+    -- A testbench may intentionally be outside the RTL source scope. Lint it
+    -- alongside that scope, using its overlaid (possibly unsaved) snapshot.
+    local current = vim.fs.normalize(vim.api.nvim_buf_get_name(source_buf))
+    local parent = uv.fs_realpath(vim.fs.dirname(current))
+    if parent then current = parent .. '/' .. vim.fs.basename(current) end
+    if inside(current, root) and (current:match('%.sv$') or current:match('%.v$')) then
+        local dest = run.dir .. '/' .. current:sub(#root + 2)
+        -- Explicitly overlay the current source even in build/obj_dir, which
+        -- are normally omitted from the mirror. Never write through a link.
+        vim.fn.mkdir(vim.fs.dirname(dest), 'p')
+        if uv.fs_lstat(dest) then assert(uv.fs_unlink(dest)) end
+        local content = vim.api.nvim_buf_get_lines(source_buf, 0, -1, false)
+        if vim.bo[source_buf].endofline then content[#content + 1] = '' end
+        assert(vim.fn.writefile(content, dest, 'b') == 0)
+        run.ticks[source_buf] = vim.api.nvim_buf_get_changedtick(source_buf)
+        if not listed[current] then list[#list + 1] = '"' .. dest .. '"' end
     end
     run.filelist = run.dir .. "/.verilator-live.f"
     if uv.fs_lstat(run.filelist) then assert(uv.fs_unlink(run.filelist)) end
@@ -161,7 +179,7 @@ function M.run(root, source_buf)
             return
         end
         local run = {}
-        local ok, err = pcall(snapshot, root, run)
+        local ok, err = pcall(snapshot, root, run, source_buf)
         if not ok then
             cleanup(run)
             vim.notify("無法建立 Verilator snapshot：" .. tostring(err), vim.log.levels.ERROR)

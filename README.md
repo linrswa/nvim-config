@@ -196,3 +196,52 @@ Workspace diagnostics are populated automatically when an LSP client attaches. `
 - `after/indent/systemverilog.lua` supplements the built-in SystemVerilog indentation: leading `)` aligns with the matching opening parenthesis's line, and `endmodule` aligns with its matching `module`. Matching ignores comments, strings, and escaped identifiers; other lines retain the built-in rules. This affects typing and `=` indentation, not `<leader>f` formatting.
 
 Use `:Mason` to inspect external tool installation and `:checkhealth` to diagnose the environment.
+
+## HDL source scope and templates
+
+Commands use the nearest `.hdl-sources`, `.git`, or `CMakeLists.txt` project root.
+
+- `:HdlSources` opens the project's **real, editable `.hdl-sources` buffer** in a float. Use `:w` to save and scan; `:q` to close. Opening it does not write a spec or scan the project.
+- `:VeribleScan` scans the saved spec and generates `verible.filelist`; `:VeribleScan!` suppresses success notifications (not errors).
+- `:HdlInstance` (existing HDL `<leader>fi`) and `:HdlTestbench` immediately open a **file-first** Telescope picker from the existing filelist. No new keymaps are added.
+- `:VerilatorLint` lints using the existing filelist and unsaved buffer overlays. Opening an existing normal HDL file (`BufReadPost`), editing, and saving trigger debounced lint, but **never rescan**. Scratch/preview buffers are skipped on open; simply switching buffers does not trigger another run. Automatic lint requires an existing `verible.filelist`. Saving `.hdl-sources` triggers a scan instead.
+
+Example `.hdl-sources` for a project with `src/` RTL and separate `tb/` benches:
+
+```text
+# One relative file or directory per line
+src/
+# Exclusions apply to all includes, regardless of order
+!src/experimental/
+```
+
+Blank lines and whole-line `#` / `//` comments are ignored. `!path` excludes that file or directory subtree. Paths are relative to the spec directory; absolute paths, parent traversal, globs, quoting and variable/home expansion are not supported. There are no inline comments. Only `.v` and `.sv` files enter the list; directory symlinks are never followed (currently all symlink entries are skipped). There are no implicit directory exclusions: name exclusions explicitly if needed. `.` explicitly opts into the whole project, but a missing/empty spec **never implicitly falls back to a root scan**. Empty scope writes an empty filelist.
+
+Scanning yields between chunks, sorts/deduplicates plain relative paths, preserves the old list on any error, and atomically renames a same-directory temporary file on success. Identical lists are not rewritten. Superseded local scans cannot publish; the saved spec is also checked again before publication to catch changes made by another editor. This is not a filesystem transaction: concurrent changes to the source tree or a spec write at the exact check/rename boundary require another scan. Unsupported/ambiguous filelist path spellings are rejected rather than escaped.
+
+### Lazy parsing and insertion
+
+File selection shows `Loading…`, debounces about 120 ms, then asynchronously runs `verible-verilog-syntax` on the **saved source**, not an unsaved source buffer. Only the focused file is parsed, with at most one worker; focus changes and closing cancel obsolete work. Stale results cannot replace a newer preview. A memory-only cache uses file size, mtime/ctime (including nanoseconds), and HDL-save invalidation. Verible is found on PATH or in the existing Mason bin directory.
+
+Enter while loading only notifies. A file with one supported module inserts below the original anchored cursor line; several modules open a second module picker. Escape/cancel inserts nothing. Parse/render failures insert nothing. Unsupported sibling modules are reported as warnings without hiding supported modules; a module whose testbench cannot be safely rendered remains visibly unavailable without blocking its valid siblings. Existing instance and testbench layouts are retained.
+
+This is a conservative ANSI-module workflow, **not a general SystemVerilog elaborator**. Non-ANSI/complex ports, required/type parameters, conditional preprocessing/includes and other unsupported interfaces are rejected. Instance parameter defaults that depend on module scope remain empty named overrides. Testbench generation must copy types/constants into a new scope, so it is stricter: only untyped/`int` nonnegative decimal parameter defaults fitting signed 32-bit are supported; scoped defaults, header localparams, unknown dimension identifiers, inout driving and unsupported type/expression cases report an error instead of silently coercing to `int` or generating broken references. Manually complete the generated check task and test cases; the skeleton is not a functional verification suite.
+
+### Lint behavior and remaining performance limits
+
+Live lint includes the current `.v`/`.sv` buffer alongside the RTL filelist even when the current testbench is excluded from that list (including a current source under `build/` or `obj_dir/`). It does not add the bench to `verible.filelist` or save the buffer. Set `b:verilator_top_module` / `g:verilator_top_module` when needed; existing `verilator_lint_args` settings still apply.
+
+The inherited lint snapshot **still synchronously mirrors the project tree** on each debounced lint run. Large repositories can therefore still stall during live lint; this change removes save-time source rescans and eager picker parsing, not all possible editor latency. Snapshot directory symlinks, external source paths/includes and excluded-directory dependencies are not general unsaved overlays. Scans use chunked synchronous filesystem calls (a single directory read can still be slow), and reading the focused saved source/decoding its CST remains on Neovim's main thread. There is no persistent index, background watcher or automatic scan on every HDL save.
+
+### HDL regression checks
+
+From this repository (no install/sync required):
+
+```sh
+nvim --headless -u NONE -l tests/hdl.lua
+nvim --headless -u NONE -l tests/hdl_open.lua
+```
+
+Requires real Verible (`~/.local/share/nvim/mason/bin/verible-verilog-syntax` for the direct renderer fixtures), Verilator on PATH, and the installed Telescope/Plenary packages under Neovim's standard data `site/pack/core/opt/` directory. Tests use disposable project directories, isolated runtime configuration and real parser/linter processes. Coverage includes scoped sorted/deduplicated discovery, symlink cycles, missing/invalid specs, unchanged writes, stale/cross-editor scans, parser worker cancellation/cache invalidation, mixed supported/unsupported modules, real Telescope loading/insertion/multiple-module/cancel and delayed-preview races, conservative TB rejection, and excluded unsaved TB diagnostics followed by a completed repaired lint run. No user RTL, live configuration, or project filelist is modified by this test.
+
+`examples/test.py` is an intentionally ill-typed example, not a Python test suite.

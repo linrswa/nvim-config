@@ -40,61 +40,37 @@ vim.api.nvim_create_autocmd("FileType", {
     end,
 })
 
-local function scan(silent)
-    local root = vim.fs.root(0, { ".git", "CMakeLists.txt" })
-    if not root then
-        vim.notify("找不到專案根目錄", vim.log.levels.ERROR)
-        return
-    end
-
-    local excluded = {
-        [".git"] = true,
-        ["build"] = true,
-        ["obj_dir"] = true,
-    }
-
-    local files = {}
-    for path, kind in vim.fs.dir(root, {
-        depth = math.huge,
-        skip = function(name)
-            return not excluded[vim.fs.basename(name)]
-        end,
-    }) do
-        if kind == "file" and (path:match("%.sv$") or path:match("%.v$")) then
-            table.insert(files, path)
-        end
-    end
-
-    table.sort(files)
-
-    local output = root .. "/verible.filelist"
-    local ok, err = pcall(vim.fn.writefile, files, output)
-    if not ok then
-        vim.notify(tostring(err), vim.log.levels.ERROR)
-        return
-    end
-
-    if not silent then
-        vim.notify(("已更新 %s：%d 個檔案"):format(output, #files))
-    end
-    return root
-end
-
+local sources = require("hdl.sources")
+vim.api.nvim_create_user_command("HdlSources", sources.open, { force = true })
 vim.api.nvim_create_user_command("VeribleScan", function(opts)
-    scan(opts.bang)
-end, {
-    desc = "掃描 RTL 並重新產生 verible.filelist（! 靜默）",
-    bang = true,
-    force = true,
+    sources.scan(sources.root(), opts.bang)
+end, { bang = true, force = true })
+vim.api.nvim_create_autocmd("BufWritePost", {
+    group = vim.api.nvim_create_augroup("HdlSourceScope", { clear = true }),
+    pattern = ".hdl-sources",
+    callback = function(args) sources.scan(vim.fs.dirname(vim.api.nvim_buf_get_name(args.buf)), true) end,
 })
 
 local lint = require("lsp.verilator_lint")
 local group = vim.api.nvim_create_augroup("HdlLintOnSave", { clear = true })
+vim.api.nvim_create_autocmd("BufReadPost", {
+    group = group,
+    pattern = { "*.sv", "*.v", "*.svh", "*.vh" },
+    callback = function(args)
+        -- Opening real sources should lint too; preview/scratch buffers must not.
+        if not vim.api.nvim_buf_is_loaded(args.buf) or vim.bo[args.buf].buftype ~= "" then return end
+        local root = sources.root(args.buf)
+        if root and vim.uv.fs_stat(root .. "/verible.filelist") then
+            lint.run(root, args.buf)
+        end
+    end,
+    desc = "開啟 HDL 檔案時以既有 filelist 執行 debounced Verilator lint",
+})
 vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "TextChangedP" }, {
     group = group,
     pattern = { "*.sv", "*.v", "*.svh", "*.vh" },
     callback = function(args)
-        local root = vim.fs.root(args.buf, { ".git", "CMakeLists.txt" })
+        local root = sources.root(args.buf)
         -- Live edits only read the existing list; never scan/write project files.
         if root and vim.uv.fs_stat(root .. "/verible.filelist") then
             lint.run(root, args.buf)
@@ -106,17 +82,18 @@ vim.api.nvim_create_autocmd("BufWritePost", {
     group = group,
     pattern = { "*.sv", "*.v", "*.svh", "*.vh" },
     callback = function(args)
-        local root = scan(true)
-        if root then
+        require("hdl.parser").invalidate(vim.api.nvim_buf_get_name(args.buf))
+        local root = sources.root(args.buf)
+        if root and vim.uv.fs_stat(root .. "/verible.filelist") then
             lint.run(root, args.buf)
         end
     end,
-    desc = "更新 filelist 並執行專案級 Verilator lint",
+    desc = "以既有 filelist 執行專案級 Verilator lint",
 })
 
 vim.api.nvim_create_user_command("VerilatorLint", function()
-    local root = scan(true)
+    local root = sources.root()
     if root then
         lint.run(root, vim.api.nvim_get_current_buf())
     end
-end, { desc = "掃描 RTL 並執行 Verilator lint", force = true })
+end, { desc = "以既有 filelist 執行 Verilator lint", force = true })
