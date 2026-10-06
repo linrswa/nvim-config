@@ -140,9 +140,17 @@ The leader key is `<Space>`.
 - `<leader>w`: Write the current buffer
 - `<leader>q`: Quit the current window
 - `<leader>e`: Browse files with mini.files
-- `<leader>f`: Format with Ruff or Verible
+- `<leader>f`: Format the buffer with Ruff or Verible; in visual `v`/`V` mode, format the selection
 - `f`, `F`, `t`, `T`, `;`: Enhanced character jumps with mini.jump
 - Insert-mode `<Tab>` / `<S-Tab>`: Completion, snippet navigation, then Tabout
+
+Visual formatting uses Ruff's native range formatting for Python and Verible's native `--lines` for Verilog/SystemVerilog. Python selections skip import organization; normal-mode formatting still organizes imports and formats the whole buffer. Selection formatting can expand to complete lines/statements as required by the formatter, rather than editing an arbitrary substring. `Ctrl-v` blockwise selections are rejected with a warning. Other filetypes retain Conform's LSP fallback (range formatting requires server support). No automatic save is performed.
+
+Formatting regression test (requires installed Conform, Ruff, and Verible; Mason binaries are supported):
+
+```sh
+nvim --headless -u NONE -i NONE -l tests/formatting.lua
+```
 
 ### Search and Telescope
 
