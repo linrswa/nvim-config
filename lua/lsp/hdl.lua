@@ -15,14 +15,14 @@ vim.lsp.config("verible", {
 
 vim.lsp.enable("verible")
 
-vim.api.nvim_create_user_command("HdlInstance", function()
+vim.api.nvim_create_user_command("RTLInstance", function()
     require("hdl.instance").open()
 end, {
     desc = "預覽並插入專案 module 的 instance 模板（使用已儲存檔案）",
     force = true,
 })
 
-vim.api.nvim_create_user_command("HdlTestbench", function()
+vim.api.nvim_create_user_command("RTLTestbench", function()
     require("hdl.instance").open_testbench()
 end, {
     desc = "預覽並插入專案 module 的 testbench 模板（使用已儲存檔案）",
@@ -33,15 +33,15 @@ vim.api.nvim_create_autocmd("FileType", {
     group = vim.api.nvim_create_augroup("HdlInstanceKeymaps", { clear = true }),
     pattern = { "verilog", "systemverilog" },
     callback = function(args)
-        vim.keymap.set("n", "<leader>fi", "<cmd>HdlInstance<CR>", {
+        vim.keymap.set("n", "<leader>fi", "<cmd>RTLInstance<CR>", {
             buffer = args.buf,
-            desc = "Find HDL instance",
+            desc = "Find RTL instance",
         })
     end,
 })
 
 local sources = require("hdl.sources")
-vim.api.nvim_create_user_command("HdlSources", sources.open, { force = true })
+vim.api.nvim_create_user_command("RTLSources", sources.open, { force = true })
 vim.api.nvim_create_user_command("VeribleScan", function(opts)
     sources.scan(sources.root(), opts.bang)
 end, { bang = true, force = true })

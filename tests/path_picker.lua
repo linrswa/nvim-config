@@ -81,7 +81,7 @@ local ok, err = xpcall(function()
     vim.cmd.undo()
     assert(current(buf) == '路徑 = ""', 'one undo did not restore target')
 
-    -- Float target, as used by :HdlSources, without requiring any HDL code.
+    -- Float target, as used by :RTLSources, without requiring any HDL code.
     local floatbuf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_name(floatbuf, root .. '/.hdl-sources')
     local float = vim.api.nvim_open_win(floatbuf, true, {

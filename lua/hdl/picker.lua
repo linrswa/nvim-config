@@ -7,7 +7,7 @@ function M.open(render, title)
     local root = require('hdl.sources').root()
     if not root then notify('cannot find project root'); return end
     local ok, lines = pcall(vim.fn.readfile, root .. '/verible.filelist')
-    if not ok then notify('Run :HdlSources and save a source scope first'); return end
+    if not ok then notify('Run :RTLSources and save a source scope first'); return end
     local files, seen = {}, {}
     for _, line in ipairs(lines) do
         line = vim.trim(line)

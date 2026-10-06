@@ -224,9 +224,9 @@ Use `:Mason` to inspect external tool installation and `:checkhealth` to diagnos
 
 Commands use the nearest `.hdl-sources`, `.git`, or `CMakeLists.txt` project root.
 
-- `:HdlSources` opens the project's **real, editable `.hdl-sources` buffer** in a float. Use `:w` to save and scan; `:q` to close. Opening it does not write a spec or scan the project.
+- `:RTLSources` opens the project's **real, editable `.hdl-sources` buffer** in a float. Use `:w` to save and scan; `:q` to close. Opening it does not write a spec or scan the project.
 - `:VeribleScan` scans the saved spec and generates `verible.filelist`; `:VeribleScan!` suppresses success notifications (not errors).
-- `:HdlInstance` (existing HDL `<leader>fi`) and `:HdlTestbench` immediately open a **file-first** Telescope picker from the existing filelist. No new keymaps are added.
+- `:RTLInstance` (existing RTL `<leader>fi`) and `:RTLTestbench` immediately open a **file-first** Telescope picker from the existing filelist. No new keymaps are added.
 - `:VerilatorLint` lints using the existing filelist and unsaved buffer overlays. Opening an existing normal HDL file (`BufReadPost`), editing, and saving trigger debounced lint, but **never rescan**. Scratch/preview buffers are skipped on open; simply switching buffers does not trigger another run. Automatic lint requires an existing `verible.filelist`. Saving `.hdl-sources` triggers a scan instead.
 
 Example `.hdl-sources` for a project with `src/` RTL and separate `tb/` benches:
