@@ -5,6 +5,9 @@ telescope.setup({})
 
 local map = vim.keymap.set
 map("n", "<leader>ff", builtin.find_files, { desc = "Find files" })
+map("n", "<leader>fp", function()
+    require("plugins.path_picker").open()
+end, { desc = "Find and paste path" })
 map("n", "<leader>fb", builtin.buffers, { desc = "Find buffers" })
 map("n", "<leader>fc", builtin.current_buffer_fuzzy_find, { desc = "Find in current buffer" })
 map("n", "<leader>fk", builtin.keymaps, { desc = "Find keymaps" })

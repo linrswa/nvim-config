@@ -149,12 +149,27 @@ The leader key is `<Space>`.
 - `n`, `N`, `*`, `#`, `g*`, `g#`: Search with hlslens result indicators
 - `<leader>l`: Clear search highlights
 - `<leader>ff`: Find files
+- `<leader>fp`: Find and paste a file/folder path into the current buffer
 - `<leader>fb`: Find buffers
 - `<leader>fc`: Search inside the current buffer
 - `<leader>fd`: Show workspace diagnostics
 - `<leader>fg`: Live grep; requires `rg`
 - `<leader>fh`: Search help tags
 - `<leader>fk`: Search keymaps
+
+#### Find and paste paths
+
+`<leader>fp` works in any modifiable buffer, including `.hdl-sources`, code, and Markdown. Telescope lists files and folders (folders end in `/`); Enter inserts the selected path **before the character under the original cursor**, or into an empty line. Esc cancels. It does not touch registers/the clipboard, save the buffer, or open the selected file. Undo with `u`. Split/tab selection keys also paste rather than opening a file. This one-shot picker is not cached for `:Telescope resume`; use `<leader>fp` again to choose a new insertion target.
+
+Search and inserted paths share the same root, shown in the picker title: the nearest ancestor containing `.git`, `.hg`, `.hdl-sources`, `CMakeLists.txt`, `pyproject.toml`, `package.json`, or `Cargo.toml`; otherwise the current working directory. Paths are plain project-relative text, without quoting/escaping (not automatically relative to a Markdown document). For `.hdl-sources`, use an empty line, then save with `:w` to run its existing scan.
+
+Discovery is chunked and needs no extra executable. It includes dotfiles and does **not** apply `.gitignore`; it skips symlinks, names containing newlines, and directories named `.git`, `.hg`, `.svn`, `node_modules`, `.venv`, `venv`, `__pycache__`, `.cache`, `build`, `dist`, `target`, or `obj_dir`. Unreadable directories are skipped with a warning. Large trees may take time to populate; Esc cancels the scan.
+
+Regression test (requires the installed Telescope/Plenary packages):
+
+```sh
+nvim --headless -u NONE -l tests/path_picker.lua
+```
 
 ### LSP and diagnostics
 
