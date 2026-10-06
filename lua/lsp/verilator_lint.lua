@@ -52,6 +52,26 @@ local function mirror(source, target)
     end
 end
 
+-- Only named file buffers can overlay a snapshot. In particular, normalizing
+-- an unnamed buffer's parent resolves to cwd and can target the snapshot root.
+local function buffer_file(buf)
+    if not vim.api.nvim_buf_is_loaded(buf) or vim.bo[buf].buftype ~= "" then return end
+    local name = vim.api.nvim_buf_get_name(buf)
+    if name == "" then return end
+    local path = vim.fs.normalize(name)
+    local stat, _, code = uv.fs_stat(path)
+    if stat then
+        if stat.type ~= "file" then return end -- Also rejects symlinks to directories.
+    elseif code ~= "ENOENT" then
+        return
+    end
+    -- ENOENT is valid for a named, not-yet-saved file. Resolve the parent to
+    -- reconcile macOS /var and /private/var without requiring the file to exist.
+    local parent = uv.fs_realpath(vim.fs.dirname(path))
+    if parent then path = parent .. "/" .. vim.fs.basename(path) end
+    return path
+end
+
 local function snapshot(root, run, source_buf)
     run.dir = vim.fn.tempname()
     snapshots[run] = true
@@ -59,12 +79,8 @@ local function snapshot(root, run, source_buf)
     run.dir = assert(uv.fs_realpath(run.dir))
     run.ticks = {}
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        local path = vim.fs.normalize(vim.api.nvim_buf_get_name(buf))
-        -- macOS temp roots may be spelled /var or /private/var. Resolve the
-        -- parent too, so a new (not yet saved) file can still be overlaid.
-        local parent = uv.fs_realpath(vim.fs.dirname(path))
-        if parent then path = parent .. "/" .. vim.fs.basename(path) end
-        if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buftype == "" and inside(path, root) then
+        local path = buffer_file(buf)
+        if path and inside(path, root) then
             local relative = path:sub(#root + 2)
             local skip = false
             for part in relative:gmatch("[^/]+") do
@@ -98,10 +114,8 @@ local function snapshot(root, run, source_buf)
     end
     -- A testbench may intentionally be outside the RTL source scope. Lint it
     -- alongside that scope, using its overlaid (possibly unsaved) snapshot.
-    local current = vim.fs.normalize(vim.api.nvim_buf_get_name(source_buf))
-    local parent = uv.fs_realpath(vim.fs.dirname(current))
-    if parent then current = parent .. '/' .. vim.fs.basename(current) end
-    if inside(current, root) and (current:match('%.sv$') or current:match('%.v$')) then
+    local current = buffer_file(source_buf)
+    if current and inside(current, root) and (current:match('%.sv$') or current:match('%.v$')) then
         local dest = run.dir .. '/' .. current:sub(#root + 2)
         -- Explicitly overlay the current source even in build/obj_dir, which
         -- are normally omitted from the mirror. Never write through a link.

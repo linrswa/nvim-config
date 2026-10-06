@@ -252,7 +252,7 @@ This is a conservative ANSI-module workflow, **not a general SystemVerilog elabo
 
 ### Lint behavior and remaining performance limits
 
-Live lint includes the current `.v`/`.sv` buffer alongside the RTL filelist even when the current testbench is excluded from that list (including a current source under `build/` or `obj_dir/`). It does not add the bench to `verible.filelist` or save the buffer. Set `b:verilator_top_module` / `g:verilator_top_module` when needed; existing `verilator_lint_args` settings still apply.
+Live lint includes the current `.v`/`.sv` buffer alongside the RTL filelist even when the current testbench is excluded from that list (including a current source under `build/` or `obj_dir/`). It does not add the bench to `verible.filelist` or save the buffer. Snapshot overlays skip unnamed buffers and directory buffers (including symlinks to directories), while retaining named, not-yet-saved files. Set `b:verilator_top_module` / `g:verilator_top_module` when needed; existing `verilator_lint_args` settings still apply.
 
 The inherited lint snapshot **still synchronously mirrors the project tree** on each debounced lint run. Large repositories can therefore still stall during live lint; this change removes save-time source rescans and eager picker parsing, not all possible editor latency. Snapshot directory symlinks, external source paths/includes and excluded-directory dependencies are not general unsaved overlays. Scans use chunked synchronous filesystem calls (a single directory read can still be slow), and reading the focused saved source/decoding its CST remains on Neovim's main thread. There is no persistent index, background watcher or automatic scan on every HDL save.
 
@@ -263,8 +263,9 @@ From this repository (no install/sync required):
 ```sh
 nvim --headless -u NONE -l tests/hdl.lua
 nvim --headless -u NONE -l tests/hdl_open.lua
+nvim --headless -u NONE -i NONE -l tests/hdl_snapshot.lua
 ```
 
-Requires real Verible (`~/.local/share/nvim/mason/bin/verible-verilog-syntax` for the direct renderer fixtures), Verilator on PATH, and the installed Telescope/Plenary packages under Neovim's standard data `site/pack/core/opt/` directory. Tests use disposable project directories, isolated runtime configuration and real parser/linter processes. Coverage includes scoped sorted/deduplicated discovery, symlink cycles, missing/invalid specs, unchanged writes, stale/cross-editor scans, parser worker cancellation/cache invalidation, mixed supported/unsupported modules, real Telescope loading/insertion/multiple-module/cancel and delayed-preview races, conservative TB rejection, and excluded unsaved TB diagnostics followed by a completed repaired lint run. No user RTL, live configuration, or project filelist is modified by this test.
+Requires real Verible (`~/.local/share/nvim/mason/bin/verible-verilog-syntax` for the direct renderer fixtures), Verilator on PATH, and the installed Telescope/Plenary packages under Neovim's standard data `site/pack/core/opt/` directory. Tests use disposable project directories, isolated runtime configuration and real parser/linter processes. Coverage includes scoped sorted/deduplicated discovery, symlink cycles, missing/invalid specs, unchanged writes, stale/cross-editor scans, parser worker cancellation/cache invalidation, mixed supported/unsupported modules, real Telescope loading/insertion/multiple-module/cancel and delayed-preview races, conservative TB rejection, and excluded unsaved TB diagnostics followed by a completed repaired lint run. The snapshot regression separately covers unnamed/directory buffers, named unsaved overlays, preservation of source files on disk, and temporary snapshot cleanup using real Verilator. No user RTL, live configuration, or project filelist is modified by these tests.
 
 `examples/test.py` is an intentionally ill-typed example, not a Python test suite.
