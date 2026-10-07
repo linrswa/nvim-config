@@ -17,29 +17,29 @@ write('rtl/a.sv', { 'module a(input logic a, output logic z); assign z=a; endmod
 write('rtl/b.v', { 'module b; endmodule', 'module c; endmodule' })
 write('tb/a_tb.sv', { 'module a_tb; endmodule' })
 assert(vim.uv.fs_symlink(root, root .. '/rtl/cycle', { dir = true }))
-write('.hdl-sources', { '# scope', 'rtl/', 'rtl/a.sv', '!rtl/b.v' })
+write('.rtl-sources', { '# scope', 'rtl/', 'rtl/a.sv', '!rtl/b.v' })
 assert(not scan())
 assert(vim.deep_equal(vim.fn.readfile(root .. '/verible.filelist'), { 'rtl/a.sv' }))
 local before = vim.uv.fs_stat(root .. '/verible.filelist')
 local err, changed = scan(); assert(not err and not changed)
 assert(vim.deep_equal(before.mtime, vim.uv.fs_stat(root .. '/verible.filelist').mtime))
-write('.hdl-sources', { 'missing' }); assert(scan())
+write('.rtl-sources', { 'missing' }); assert(scan())
 assert(vim.deep_equal(vim.fn.readfile(root .. '/verible.filelist'), { 'rtl/a.sv' }))
-vim.fn.delete(root .. '/.hdl-sources'); assert(scan())
+vim.fn.delete(root .. '/.rtl-sources'); assert(scan())
 for _, line in ipairs({ '../rtl', '/rtl', 'rtl/*.sv', 'rtl/[ab]', '~/rtl' }) do assert(not pcall(sources.parse, { line })) end
-write('.hdl-sources', { 'rtl' })
+write('.rtl-sources', { 'rtl' })
 local stale = false
 sources.scan(root, true, function() stale = true end)
-write('.hdl-sources', { 'rtl/a.sv' }); assert(not scan()); assert(not stale)
-write('.hdl-sources', { 'rtl' })
+write('.rtl-sources', { 'rtl/a.sv' }); assert(not scan()); assert(not stale)
+write('.rtl-sources', { 'rtl' })
 local cross_done, cross_error
 sources.scan(root, true, function(e) cross_done, cross_error = true, e end)
-write('.hdl-sources', { 'tb' }) -- emulate another editor, without starting a local scan
+write('.rtl-sources', { 'tb' }) -- emulate another editor, without starting a local scan
 wait(function() return cross_done end, 'cross-editor scan timeout'); assert(cross_error)
 assert(vim.deep_equal(vim.fn.readfile(root .. '/verible.filelist'), { 'rtl/a.sv' }))
-write('.hdl-sources', { 'rtl/cycle/rtl' }); assert(not scan())
+write('.rtl-sources', { 'rtl/cycle/rtl' }); assert(not scan())
 assert(#vim.fn.readfile(root .. '/verible.filelist') == 0, 'followed directory symlink')
-write('.hdl-sources', { 'rtl' }); assert(not scan())
+write('.rtl-sources', { 'rtl' }); assert(not scan())
 
 local parser = require('hdl.parser')
 local real_system, starts, workers, maximum = vim.system, 0, 0, 0
@@ -165,7 +165,7 @@ vim.system = real_system
 
 -- Excluded unsaved TB must still be linted alongside RTL, and repaired
 -- diagnostics are checked only after a real second process has completed.
-write('.hdl-sources', { 'rtl/a.sv' }); assert(not scan())
+write('.rtl-sources', { 'rtl/a.sv' }); assert(not scan())
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
     'module current;', 'logic x, y;', 'a dut(.a(x), .z(y));',
     'initial begin x = nonexistent_signal; #1; $finish; end', 'endmodule',

@@ -47,7 +47,7 @@ vim.api.nvim_create_user_command("VeribleScan", function(opts)
 end, { bang = true, force = true })
 vim.api.nvim_create_autocmd("BufWritePost", {
     group = vim.api.nvim_create_augroup("HdlSourceScope", { clear = true }),
-    pattern = ".hdl-sources",
+    pattern = ".rtl-sources",
     callback = function(args) sources.scan(vim.fs.dirname(vim.api.nvim_buf_get_name(args.buf)), true) end,
 })
 

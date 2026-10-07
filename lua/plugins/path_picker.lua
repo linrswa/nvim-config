@@ -17,7 +17,7 @@ function M.open()
     local buf, win = vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
     if not vim.bo[buf].modifiable then notify('buffer is not modifiable'); return end
     local root = vim.fs.root(buf, {
-        '.git', '.hg', '.hdl-sources', 'CMakeLists.txt', 'pyproject.toml', 'package.json', 'Cargo.toml',
+        '.git', '.hg', '.rtl-sources', 'CMakeLists.txt', 'pyproject.toml', 'package.json', 'Cargo.toml',
     }) or vim.fn.getcwd()
     root = vim.fs.normalize(root)
     local available, pickers = pcall(require, 'telescope.pickers')

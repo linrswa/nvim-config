@@ -2,7 +2,7 @@
 local M = {}
 local uv = vim.uv
 local jobs = {}
-function M.root(buf) return vim.fs.root(buf or 0, { '.hdl-sources', '.git', 'CMakeLists.txt' }) end
+function M.root(buf) return vim.fs.root(buf or 0, { '.rtl-sources', '.git', 'CMakeLists.txt' }) end
 function M.parse(lines)
     local includes, excludes = {}, {}
     for n, line in ipairs(lines) do
@@ -33,7 +33,7 @@ function M.scan(root, silent, done)
     end
     local original
     local ok, inc, exc = pcall(function()
-        original = vim.fn.readfile(root .. '/.hdl-sources')
+        original = vim.fn.readfile(root .. '/.rtl-sources')
         return M.parse(original)
     end)
     if not ok then finish(inc); return end
@@ -73,8 +73,8 @@ function M.scan(root, silent, done)
                 elseif queue[index] then
                     local path = queue[index]; index = index + 1; inspect(path)
                 else
-                    assert(vim.deep_equal(original, vim.fn.readfile(root .. '/.hdl-sources')),
-                        '.hdl-sources changed during scan; run :VeribleScan again')
+                    assert(vim.deep_equal(original, vim.fn.readfile(root .. '/.rtl-sources')),
+                        '.rtl-sources changed during scan; run :VeribleScan again')
                     table.sort(files)
                     local output = root .. '/verible.filelist'
                     local readable, old = pcall(vim.fn.readfile, output)
@@ -97,7 +97,7 @@ end
 function M.open()
     local root = M.root()
     if not root then vim.notify('HDL: cannot find project root', vim.log.levels.ERROR); return end
-    local path = root .. '/.hdl-sources'
+    local path = root .. '/.rtl-sources'
     local buf = vim.fn.bufadd(path); vim.fn.bufload(buf)
     vim.bo[buf].bufhidden = 'hide'
     if not uv.fs_stat(path) and vim.api.nvim_buf_line_count(buf) == 1 then
@@ -110,6 +110,6 @@ function M.open()
     local w, h = math.max(1, math.min(90, vim.o.columns - 4)), math.max(1, math.min(24, vim.o.lines - 4))
     vim.api.nvim_open_win(buf, true, { relative = 'editor', width = w, height = h,
         row = math.floor((vim.o.lines - h) / 2), col = math.floor((vim.o.columns - w) / 2),
-        border = 'rounded', title = ' .hdl-sources — :w scans, :q closes ', style = 'minimal' })
+        border = 'rounded', title = ' .rtl-sources — :w scans, :q closes ', style = 'minimal' })
 end
 return M

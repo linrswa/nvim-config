@@ -10,6 +10,7 @@ package.loaded['lsp.verilator_lint'] = {
     run = function(project, buf) calls[#calls + 1] = { project = project, buf = buf } end,
 }
 local sources = require('hdl.sources')
+local real_scan = sources.scan
 sources.scan = function() error('opening a source must never scan') end
 require('lsp.hdl')
 vim.lsp.enable('verible', false)
@@ -34,9 +35,25 @@ for _, ft in ipairs({ 'verilog', 'systemverilog' }) do
 end
 local original_win = vim.api.nvim_get_current_win()
 vim.cmd.RTLSources()
-assert(vim.fs.basename(vim.api.nvim_buf_get_name(0)) == '.hdl-sources', 'RTLSources opened wrong buffer')
+assert(vim.fs.basename(vim.api.nvim_buf_get_name(0)) == '.rtl-sources', 'RTLSources opened wrong buffer')
 assert(vim.api.nvim_win_get_config(0).relative == 'editor', 'RTLSources did not open a float')
-assert(vim.fn.filereadable(root .. '/.hdl-sources') == 0, 'RTLSources unexpectedly saved the spec')
+assert(vim.fn.filereadable(root .. '/.rtl-sources') == 0, 'RTLSources unexpectedly saved the spec')
+-- Saving the new filename must trigger a real scan; it alone identifies a root.
+local scan_count, scan_done, scan_error = 0, false, nil
+sources.scan = function(project, silent)
+    scan_count = scan_count + 1
+    real_scan(project, silent, function(err) scan_done, scan_error = true, err end)
+end
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'dut.sv' })
+vim.cmd.write()
+assert(vim.wait(5000, function() return scan_done end, 10), 'saving .rtl-sources did not scan')
+assert(scan_count == 1 and not scan_error, tostring(scan_error))
+assert(vim.deep_equal(vim.fn.readfile(root .. '/verible.filelist'), { 'dut.sv' }))
+vim.fn.delete(root .. '/.git', 'rf')
+assert(vim.uv.fs_realpath(sources.root()) == vim.uv.fs_realpath(root), '.rtl-sources root marker not found')
+vim.api.nvim_exec_autocmds('BufWritePost', { pattern = root .. '/.hdl-sources' })
+assert(scan_count == 1, 'old filename still triggers scanning')
+sources.scan = function() error('opening a source must never scan') end
 vim.api.nvim_win_close(0, true)
 vim.api.nvim_set_current_win(original_win)
 vim.api.nvim_exec_autocmds('BufEnter', { buffer = 0 })
