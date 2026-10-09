@@ -41,59 +41,80 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 local sources = require("hdl.sources")
+local lint = require("lsp.verilator_lint")
+local function hdl_buffer(buf)
+    if not vim.api.nvim_buf_is_loaded(buf) or vim.bo[buf].buftype ~= "" then return false end
+    local name = vim.api.nvim_buf_get_name(buf)
+    return name:match("%.svh?$") or name:match("%.vh?$")
+end
+local function request(buf, refresh)
+    if not hdl_buffer(buf) then return end
+    local root = sources.root(buf)
+    if not root then return end
+    local scope = vim.uv.fs_stat(root .. "/.rtl-sources")
+    local list = vim.uv.fs_stat(root .. "/verible.filelist")
+    if scope and (refresh or not list) then
+        lint.refresh(root, buf, true)
+    elseif list then
+        lint.run(root, buf)
+    end
+end
 vim.api.nvim_create_user_command("RTLSources", sources.open, { force = true })
 vim.api.nvim_create_user_command("VeribleScan", function(opts)
-    sources.scan(sources.root(), opts.bang)
+    local buf = vim.api.nvim_get_current_buf()
+    lint.refresh(sources.root(), hdl_buffer(buf) and buf or nil, opts.bang)
 end, { bang = true, force = true })
 vim.api.nvim_create_autocmd("BufWritePost", {
     group = vim.api.nvim_create_augroup("HdlSourceScope", { clear = true }),
     pattern = ".rtl-sources",
-    callback = function(args) sources.scan(vim.fs.dirname(vim.api.nvim_buf_get_name(args.buf)), true) end,
+    callback = function(args)
+        lint.refresh(vim.fs.dirname(vim.api.nvim_buf_get_name(args.buf)), nil, true)
+    end,
 })
 
-local lint = require("lsp.verilator_lint")
 local group = vim.api.nvim_create_augroup("HdlLintOnSave", { clear = true })
-vim.api.nvim_create_autocmd("BufReadPost", {
+vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "BufEnter", "BufFilePost" }, {
     group = group,
     pattern = { "*.sv", "*.v", "*.svh", "*.vh" },
-    callback = function(args)
-        -- Opening real sources should lint too; preview/scratch buffers must not.
-        if not vim.api.nvim_buf_is_loaded(args.buf) or vim.bo[args.buf].buftype ~= "" then return end
-        local root = sources.root(args.buf)
-        if root and vim.uv.fs_stat(root .. "/verible.filelist") then
-            lint.run(root, args.buf)
-        end
+    callback = function(args) request(args.buf, true) end,
+    desc = "進入或重新命名 HDL buffer 時刷新 scope，再執行 lint",
+})
+vim.api.nvim_create_autocmd({ "FocusGained", "TermLeave" }, {
+    group = group,
+    callback = function()
+        local buf = vim.api.nvim_get_current_buf()
+        if hdl_buffer(buf) then request(buf, true); return end
+        -- Also refresh when returning to a terminal or another file in the project.
+        local root = sources.root(buf) or sources.root(vim.fn.getcwd())
+        if root and vim.uv.fs_stat(root .. "/.rtl-sources") then lint.refresh(root, nil, true) end
     end,
-    desc = "開啟 HDL 檔案時以既有 filelist 執行 debounced Verilator lint",
+    desc = "回到編輯器／離開 terminal 時刷新目前專案",
 })
 vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "TextChangedP" }, {
     group = group,
     pattern = { "*.sv", "*.v", "*.svh", "*.vh" },
-    callback = function(args)
-        local root = sources.root(args.buf)
-        -- Live edits only read the existing list; never scan/write project files.
-        if root and vim.uv.fs_stat(root .. "/verible.filelist") then
-            lint.run(root, args.buf)
-        end
-    end,
-    desc = "以未儲存的 buffer 執行 debounced Verilator lint",
+    callback = function(args) request(args.buf, false) end,
+    desc = "一般打字沿用 filelist；pending refresh 完成後才 lint",
 })
 vim.api.nvim_create_autocmd("BufWritePost", {
     group = group,
     pattern = { "*.sv", "*.v", "*.svh", "*.vh" },
     callback = function(args)
+        if not hdl_buffer(args.buf) then return end
         require("hdl.parser").invalidate(vim.api.nvim_buf_get_name(args.buf))
-        local root = sources.root(args.buf)
-        if root and vim.uv.fs_stat(root .. "/verible.filelist") then
-            lint.run(root, args.buf)
-        end
+        request(args.buf, true)
     end,
-    desc = "以既有 filelist 執行專案級 Verilator lint",
+    desc = "儲存 HDL 後刷新 scope，再執行 lint",
 })
 
 vim.api.nvim_create_user_command("VerilatorLint", function()
+    local buf = vim.api.nvim_get_current_buf()
     local root = sources.root()
     if root then
-        lint.run(root, vim.api.nvim_get_current_buf())
+        if vim.uv.fs_stat(root .. "/.rtl-sources") then
+            lint.refresh(root, hdl_buffer(buf) and buf or nil, true)
+        elseif hdl_buffer(buf) then
+            lint.run(root, buf)
+        end
     end
-end, { desc = "以既有 filelist 執行 Verilator lint", force = true })
+end, { desc = "刷新 RTL scope 後執行 Verilator lint", force = true })
