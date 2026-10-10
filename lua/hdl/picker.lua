@@ -49,9 +49,55 @@ function M.open(render, title)
     local show
     show = function(items, modules)
         local transferring = false
-        local focused, result
-        pickers.new({}, {
+        local focused, result, content, preview, preview_item
+        local function paint()
+            if not closed and not transferring and preview and preview_item == focused
+                and vim.api.nvim_buf_is_valid(preview) then
+                vim.api.nvim_buf_set_lines(preview, 0, -1, false, content or {})
+                vim.bo[preview].filetype = 'systemverilog'
+            end
+        end
+        -- Parsing belongs to selection state, not to the optional preview window.
+        local function focus(entry)
+            if closed or transferring then return end
+            local item = entry and entry.value
+            if focused == item then paint(); return end
+            stop(); local ticket = generation
+            focused, result, content = item, nil, item and { '// Loading…' } or {}
+            paint()
+            if not item then return end
+            local function ready(value)
+                if closed or transferring or ticket ~= generation then return end
+                result = value
+                if value.error then
+                    content = vim.split(value.error, '\n', { plain = true }); paint(); return
+                end
+                content = {}
+                for _, warning in ipairs(value.warnings or {}) do
+                    content[#content + 1] = '// Warning: ' .. warning
+                end
+                for _, module in ipairs(value.modules) do
+                    local good, rendered = pcall(render, module)
+                    if not good then
+                        if #value.modules == 1 then result = { error = tostring(rendered) } end
+                        content[#content + 1] = '// ' .. module.name .. ': unavailable'
+                        vim.list_extend(content, vim.split(tostring(rendered), '\n'))
+                    else
+                        vim.list_extend(content, rendered)
+                    end
+                    content[#content + 1] = ''
+                end
+                paint()
+            end
+            if modules then ready({ modules = { item } }); return end
+            vim.defer_fn(function()
+                if closed or transferring or ticket ~= generation then return end
+                cancel = require('hdl.parser').request(item.path, root, ready)
+            end, 120)
+        end
+        local picker = pickers.new({}, {
             prompt_title = modules and 'Choose module' or title,
+            cache_picker = false, -- Closing destroys this one-shot insertion anchor.
             finder = require('telescope.finders').new_table({ results = items, entry_maker = function(item)
                 local label = modules and item.name or item.label
                 return { value = item, display = label, ordinal = label }
@@ -59,42 +105,8 @@ function M.open(render, title)
             sorter = require('telescope.config').values.generic_sorter({}),
             previewer = require('telescope.previewers').new_buffer_previewer({ title = title,
                 define_preview = function(self, entry)
-                    stop(); local ticket = generation
-                    focused, result = entry.value, nil
-                    local preview = self.state.bufnr
-                    local function paint(content)
-                        if not closed and ticket == generation and vim.api.nvim_buf_is_valid(preview) then
-                            vim.api.nvim_buf_set_lines(preview, 0, -1, false, content)
-                            vim.bo[preview].filetype = 'systemverilog'
-                        end
-                    end
-                    local function ready(value)
-                        if closed or ticket ~= generation then return end
-                        result = value
-                        if value.error then paint(vim.split(value.error, '\n', { plain = true })); return end
-                        local content = {}
-                        for _, warning in ipairs(value.warnings or {}) do
-                            content[#content + 1] = '// Warning: ' .. warning
-                        end
-                        for _, module in ipairs(value.modules) do
-                            local good, rendered = pcall(render, module)
-                            if not good then
-                                if #value.modules == 1 then result = { error = tostring(rendered) } end
-                                content[#content + 1] = '// ' .. module.name .. ': unavailable'
-                                vim.list_extend(content, vim.split(tostring(rendered), '\n'))
-                            else
-                                vim.list_extend(content, rendered)
-                            end
-                            content[#content + 1] = ''
-                        end
-                        paint(content)
-                    end
-                    if modules then ready({ modules = { entry.value } }); return end
-                    paint({ '// Loading…' })
-                    vim.defer_fn(function()
-                        if closed or ticket ~= generation then return end
-                        cancel = require('hdl.parser').request(entry.value.path, root, ready)
-                    end, 120)
+                    preview, preview_item = self.state.bufnr, entry.value
+                    paint()
                 end,
             }),
             attach_mappings = function(prompt, map)
@@ -105,12 +117,18 @@ function M.open(render, title)
                 end })
                 actions.select_default:replace(function()
                     local entry = state.get_selected_entry()
-                    if not entry or focused ~= entry.value or not result then notify('Loading…'); return end
+                    focus(entry) -- Defensive fallback if selection changed without set_selection.
+                    if not entry then return end
+                    if not result then notify('Loading…'); return end
                     if result.error then notify(result.error); return end
                     if #result.modules > 1 then
                         local choices = result.modules
                         transferring = true; stop(); actions.close(prompt)
-                        vim.schedule(function() if not closed then show(choices, true) end end)
+                        vim.schedule(function()
+                            if closed then return end
+                            local good, err = pcall(show, choices, true)
+                            if not good then cleanup(); notify(err) end
+                        end)
                     else
                         local module = result.modules[1]
                         transferring = true; stop(); actions.close(prompt)
@@ -119,7 +137,15 @@ function M.open(render, title)
                 end)
                 return true
             end,
-        }):find()
+        })
+        -- Telescope calls set_selection for navigation and filtered results even
+        -- when preview_cutoff hides the preview. Keep this hook picker-local.
+        local set_selection = picker.set_selection
+        picker.set_selection = function(self, row)
+            set_selection(self, row)
+            focus(self:get_selection())
+        end
+        picker:find()
     end
     local good, err = pcall(show, files, false)
     if not good then cleanup(); notify(err) end
